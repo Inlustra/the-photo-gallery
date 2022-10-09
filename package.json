@@ -4,21 +4,34 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "gen": "node ./script/generate.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
+    "await-to-js": "^3.0.0",
+    "chokidar": "^3.5.3",
+    "image-size": "^1.0.2",
     "next": "12.3.1",
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "react-image-lightbox": "^5.1.4",
+    "react-images": "^1.2.0-beta.7",
+    "react-photo-gallery": "^8.0.0",
+    "react-use": "^17.4.0",
+    "styled-components": "^5.3.6"
   },
   "devDependencies": {
+    "@supercharge/promise-pool": "^2.3.2",
     "@types/node": "18.8.3",
     "@types/react": "18.0.21",
     "@types/react-dom": "18.0.6",
+    "axios": "^1.1.2",
     "eslint": "8.25.0",
     "eslint-config-next": "12.3.1",
+    "plaiceholder": "^2.5.0",
+    "sharp": "^0.31.1",
     "typescript": "4.8.4"
   }
 }
