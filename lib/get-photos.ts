@@ -56,13 +56,19 @@ const writeJSONFile = async (file: JSONFile) => {
   if (error) console.error(error);
 };
 
+const allowedFileTypes = [".jpg", ".png"];
+
 const checkFiles = async (previousJSON?: JSONFile) => {
   const [dirError, dir] = await to(readDir(photosDir));
   if (dirError) {
     console.error("Error reading the photos directory", photosDir);
     throw dirError;
   }
-  const result = await PromisePool.for(dir)
+  const result = await PromisePool.for(
+    dir.filter((file) =>
+      allowedFileTypes.some((ext) => file.toLowerCase().endsWith(ext))
+    )
+  )
     .withConcurrency(concurrency)
     .process(async (file) => {
       const imageStats = await stat(`${photosDir}/${file}`);
@@ -72,7 +78,6 @@ const checkFiles = async (previousJSON?: JSONFile) => {
         previousJSON[file] &&
         previousJSON[file].size === imageStats.size
       ) {
-        console.log(`Skipping ${file}`);
         return {
           [file]: {
             ...previousJSON[file],

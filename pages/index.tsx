@@ -1,5 +1,5 @@
 import type { GetServerSideProps, GetStaticProps, NextPage } from "next";
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import Gallery, {
   PhotoProps,
   PhotoClickHandler,
@@ -12,8 +12,57 @@ import useMedia from "react-use/lib/useMedia";
 import "react-image-lightbox/style.css"; // This only needs to be imported once in your app
 import { getPhotos, LoadedPhoto } from "../lib/get-photos";
 import Head from "next/head";
+import styled from "styled-components";
+import useFullscreen from "react-use/lib/useFullscreen";
+import useToggle from "react-use/lib/useToggle";
 
 type Blur = { blurDataURL: string };
+
+const PhotoContainer = styled.div`
+  transition: transform 0.1s ease;
+  cursor: pointer;
+  border: 2px solid black;
+
+  @media (min-width: 480px) {
+    &:hover {
+      transform: scale(1.15);
+      z-index: 999;
+    }
+  }
+`;
+
+const Header = styled.div`
+  width: 100%;
+  color: white;
+  font-family: "Frank Ruhl Libre", serif;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 22px;
+  margin-top: 12px;
+`;
+
+const FullScreenButton = styled.button`
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 18px;
+  background-color: black;
+  border: 1px solid white;
+  font-family: "Frank Ruhl Libre", serif;
+  border-radius: 4px;
+  margin-top: 8px;
+  padding-left: 6px;
+  padding-right: 6px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  &:hover {
+    background-color: white;
+    color: black;
+  }
+`;
 
 const Photo: React.FC<RenderImageProps<PhotoProps & Blur>> = ({
   photo,
@@ -21,7 +70,7 @@ const Photo: React.FC<RenderImageProps<PhotoProps & Blur>> = ({
   index,
 }) => {
   return (
-    <div onClick={(evt) => onClick?.(evt, { index, ...photo })}>
+    <PhotoContainer onClick={(evt) => onClick?.(evt, { index, ...photo })}>
       <ImageC
         key={`photo-${index}`}
         src={photo.src}
@@ -30,9 +79,10 @@ const Photo: React.FC<RenderImageProps<PhotoProps & Blur>> = ({
         blurDataURL={photo.blurDataURL}
         placeholder="blur"
         alt="photo"
-        style={{ marginLeft: 2, marginRight: 2 }}
+        className="photo"
+        style={{ height: "100%" }}
       />
-    </div>
+    </PhotoContainer>
   );
 };
 
@@ -73,6 +123,13 @@ const Home: NextPage<HomeProps> = ({ photos, title }) => {
     [currentImage, paginatedImages]
   );
 
+  const [isFullscreen, setFullscreen] = useState(false);
+  const toggleFullScreen = useCallback(() => {
+    if (!isFullscreen) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+    setFullscreen((fs) => !fs);
+  }, [isFullscreen, setFullscreen]);
+
   const next = useCallback(() => {
     if (currentImage === paginatedImages.length - 1) {
       loadMore();
@@ -98,6 +155,13 @@ const Home: NextPage<HomeProps> = ({ photos, title }) => {
       <Head>
         <title>{title ?? "Photo Stream"}</title>
       </Head>
+
+      <Header>
+        03/09/2022
+        <FullScreenButton onClick={toggleFullScreen}>
+          {!isFullscreen ? "View in Fullscreen" : "Exit Fullscreen"}
+        </FullScreenButton>
+      </Header>
       {viewerIsOpen ? (
         <Lightbox
           mainSrc={mainSrc}
@@ -109,6 +173,7 @@ const Home: NextPage<HomeProps> = ({ photos, title }) => {
           onMoveNextRequest={next}
           onMovePrevRequest={previous}
           onCloseRequest={() => setViewerIsOpen(false)}
+          discourageDownloads={false}
         />
       ) : null}
       <Gallery
@@ -124,7 +189,7 @@ export const getStaticProps: GetStaticProps<HomeProps> = async () => {
   const photos = await getPhotos();
   return {
     props: {
-      title: process.env.NEXT_PUBLIC_TITLE ?? 'Photo Stream',
+      title: process.env.NEXT_PUBLIC_TITLE ?? "Photo Stream",
       photos,
     },
   };
