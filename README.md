@@ -23,6 +23,18 @@ These are my midjourney creations, this website was built for my wedding and as 
 
 https://user-images.githubusercontent.com/2565465/194875343-54db9659-176b-4d4c-be38-bcee103018d7.mp4
 
+### Why?
+I've honestly not been able to find a simple plug and play photo sharing website for sharing the wedding photos.
+
+My goals were:
+- Mount a directory with photos in it (So that the wife can manage and delete the photos she doesn't want)
+- Reduce bandwidth costs of sharing photos
+- Allow images to be enlarged
+- Take up the full screen width
+- Static HTML - why should my server be hammered every render?
+
+I already host a ton of stuff using [Caddy](https://caddyserver.com/) so wanted a simple container to route traffic to.
+
 ## Getting Started
 ### docker-compose.yml
 ```yml
@@ -31,6 +43,8 @@ services:
   thephotogallery:
     container_name: thephotogallery
     image: inlustra/the-photo-gallery:0.0.1
+    ports:
+      - 3000:3000
     volumes:
       - {YOUR_PHOTOS_DIRECTORY}:/app/public/photos:ro
       - {A_STORAGE_LOCATION}:/app/storage
