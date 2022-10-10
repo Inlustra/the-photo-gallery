@@ -45,10 +45,10 @@ const config = convict({
   },
 } as const);
 
-config.validate({allowed: 'strict'});
+config.validate({ allowed: "strict" });
 
 const result = config.get();
 
 console.debug(result);
 
-export default result
+export default result;

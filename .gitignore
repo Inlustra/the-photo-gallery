@@ -37,3 +37,4 @@ next-env.d.ts
 
 storage/photos.json
 script/download.mjs
+example-photos/

@@ -7,8 +7,8 @@ services:
     ports:
       - 3000:3000
     volumes:
-      # - ./public/photos:/app/public/photos:ro
-      - ./storage:/app/storage
+      - /mnt/user/Internal/next-photo-stream/example-photos:/app/public/photos:ro
+      - /mnt/user/Internal/next-photo-stream/storage:/app/storage
     environment:
       PAGE_TITLE: 'The Photo Gallery'
       PAGE_HEADER_TEXT: 'Inlustra'

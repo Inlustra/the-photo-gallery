@@ -7,7 +7,7 @@ A simple, featureless (By design) full-width photo gallery.
 - Lightbox built-in
 - Automatic image optimization courtesy of NextJS and team
 - Generation of loading blurs
-- Server side rendered, once deployed to production, it's **quick**
+- Statically generated, the server just serves regular HTML + JS, once deployed to production, it's **quick**
 - Automatic dynamic regeneration should you edit/remove/add photos
 - Can handle hundreds (And thousands?) of images at a time
 - Lazy loading as you scroll

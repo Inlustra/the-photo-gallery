@@ -7,3 +7,4 @@ README.md
 .git
 script/download.mjs
 docker-compose.yml
+./example-photos
