@@ -17,6 +17,11 @@ A simple, featureless (By design) full-width photo gallery.
   - Created time
   - Regular file names (a.jpg, b.jpg...) (2022-10-09.jpg, 2022-10-10.jpg...)
   - Reverse of any of the above!
+  
+## Example
+These are my midjourney creations, this website was built for my wedding and as such, real photos look a lot better!
+
+https://user-images.githubusercontent.com/2565465/194875343-54db9659-176b-4d4c-be38-bcee103018d7.mp4
 
 ## Getting Started
 ### docker-compose.yml
