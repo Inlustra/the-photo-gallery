@@ -1,5 +1,5 @@
 {
-  "name": "next-photo-stream",
+  "name": "the-photo-gallery",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -12,22 +12,25 @@
   "dependencies": {
     "await-to-js": "^3.0.0",
     "chokidar": "^3.5.3",
+    "convict": "^6.2.3",
     "image-size": "^1.0.2",
     "next": "12.3.1",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-image-lightbox": "^5.1.4",
-    "react-images": "^1.2.0-beta.7",
     "react-photo-gallery": "^8.0.0",
     "react-use": "^17.4.0",
-    "styled-components": "^5.3.6"
+    "styled-components": "^5.3.6",
+    "workerpool": "^6.2.1"
   },
   "devDependencies": {
     "@supercharge/promise-pool": "^2.3.2",
+    "@types/convict": "^6.1.1",
     "@types/node": "18.8.3",
     "@types/react": "18.0.21",
     "@types/react-dom": "18.0.6",
     "@types/styled-components": "^5.1.26",
+    "@types/workerpool": "^6.1.0",
     "axios": "^1.1.2",
     "eslint": "8.25.0",
     "eslint-config-next": "12.3.1",

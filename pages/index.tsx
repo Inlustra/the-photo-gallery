@@ -1,5 +1,5 @@
-import type { GetServerSideProps, GetStaticProps, NextPage } from "next";
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import type { GetStaticProps, NextPage } from "next";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import Gallery, {
   PhotoProps,
   PhotoClickHandler,
@@ -13,8 +13,7 @@ import "react-image-lightbox/style.css"; // This only needs to be imported once 
 import { getPhotos, LoadedPhoto } from "../lib/get-photos";
 import Head from "next/head";
 import styled from "styled-components";
-import useFullscreen from "react-use/lib/useFullscreen";
-import useToggle from "react-use/lib/useToggle";
+import environment from "../lib/environment";
 
 type Blur = { blurDataURL: string };
 
@@ -40,7 +39,7 @@ const Header = styled.div`
   justify-content: center;
   align-items: center;
   font-size: 22px;
-  margin-top: 12px;
+  margin-top: 8px;
 `;
 
 const FullScreenButton = styled.button`
@@ -88,10 +87,17 @@ const Photo: React.FC<RenderImageProps<PhotoProps & Blur>> = ({
 
 interface HomeProps {
   title: string;
+  headerText: string | null;
+  showFullscreenButton: boolean | null;
   photos: LoadedPhoto[];
 }
 
-const Home: NextPage<HomeProps> = ({ photos, title }) => {
+const Home: NextPage<HomeProps> = ({
+  photos,
+  title,
+  headerText,
+  showFullscreenButton,
+}) => {
   const isTablet = useMedia("(min-width: 480px)", true);
   const amountOfPhotosToLoad = useMemo(() => (isTablet ? 40 : 10), [isTablet]);
   const [paginatedImages, setPaginatedImages] = useState(
@@ -153,15 +159,19 @@ const Home: NextPage<HomeProps> = ({ photos, title }) => {
   return (
     <div>
       <Head>
-        <title>{title ?? "Photo Stream"}</title>
+        <title>{title ?? "The Photo Gallery"}</title>
       </Head>
 
-      <Header>
-        03/09/2022
-        <FullScreenButton onClick={toggleFullScreen}>
-          {!isFullscreen ? "View in Fullscreen" : "Exit Fullscreen"}
-        </FullScreenButton>
-      </Header>
+      {headerText || showFullscreenButton ? (
+        <Header>
+          {headerText}
+          {showFullscreenButton ? (
+            <FullScreenButton onClick={toggleFullScreen}>
+              {!isFullscreen ? "View in Fullscreen" : "Exit Fullscreen"}
+            </FullScreenButton>
+          ) : null}
+        </Header>
+      ) : null}
       {viewerIsOpen ? (
         <Lightbox
           mainSrc={mainSrc}
@@ -189,7 +199,9 @@ export const getStaticProps: GetStaticProps<HomeProps> = async () => {
   const photos = await getPhotos();
   return {
     props: {
-      title: process.env.NEXT_PUBLIC_TITLE ?? "Photo Stream",
+      title: environment.page.title,
+      headerText: environment.page.headerText ?? null,
+      showFullscreenButton: environment.page.showFullscreenButton ?? null,
       photos,
     },
   };

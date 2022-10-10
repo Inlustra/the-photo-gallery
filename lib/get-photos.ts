@@ -1,14 +1,15 @@
 import fs from "fs";
 import { promisify } from "util";
 import to from "await-to-js";
-import imageSize from "image-size";
-import { PromisePool } from "@supercharge/promise-pool";
-import { getPlaiceholder } from "plaiceholder";
+import environment from "./environment";
+import workerPool from "workerpool";
+
+// Import this, not for it to do anything, but to ensure that nextjs keeps all of its dependencies
+import "../process-image";
+
 const writeFile = promisify(fs.writeFile);
 const readFile = promisify(fs.readFile);
-const stat = promisify(fs.stat);
 const readDir = promisify(fs.readdir);
-const sizeOf = promisify(imageSize);
 
 export interface LoadedPhoto {
   height: number;
@@ -22,22 +23,6 @@ export interface LoadedPhoto {
 export type JSONFile = { [key: string]: LoadedPhoto };
 
 const photosDir = "./public/photos";
-const concurrency = parseInt(process.env.PHOTO_PROCESS_CONCURRENCY ?? "20");
-const sort = process.env.SORT ?? "file_name";
-const reverse = !!process.env.REVERSE ?? false;
-
-async function processImage(imagePath: string) {
-  const imageSize = await sizeOf(imagePath);
-  if (!imageSize?.width || !imageSize.height)
-    throw new Error("Error getting image size");
-  const blurDataURL = await getPlaiceholder(`/${imagePath}`, { dir: "." });
-  return {
-    src: imagePath.split("/public")[1],
-    width: imageSize?.width,
-    height: imageSize?.height,
-    blurDataURL: blurDataURL.base64,
-  };
-}
 
 const getJSONFile = async (): Promise<JSONFile | undefined> => {
   const [fileError, file] = await to(readFile(`./storage/photos.json`));
@@ -64,51 +49,31 @@ const checkFiles = async (previousJSON?: JSONFile) => {
     console.error("Error reading the photos directory", photosDir);
     throw dirError;
   }
-  const result = await PromisePool.for(
-    dir.filter((file) =>
-      allowedFileTypes.some((ext) => file.toLowerCase().endsWith(ext))
-    )
-  )
-    .withConcurrency(concurrency)
-    .process(async (file) => {
-      const imageStats = await stat(`${photosDir}/${file}`);
+  const allowedPhotos = dir.filter((file) =>
+    allowedFileTypes.some((ext) => file.toLowerCase().endsWith(ext))
+  );
 
-      if (
-        previousJSON &&
-        previousJSON[file] &&
-        previousJSON[file].size === imageStats.size
-      ) {
-        return {
-          [file]: {
-            ...previousJSON[file],
-            createdAt: imageStats.mtimeMs,
-          },
-        };
-      }
-      console.log(`Processing image ${file}`);
-      const image = await processImage(`${photosDir}/${file}`);
+  const pool = workerPool.pool(`./process-image.js`);
+  const results = allowedPhotos
+    .map(
+      (photo) =>
+        [photosDir, JSON.stringify(previousJSON?.[photo]), photo] as const
+    )
+    .map(async (vars) => {
+      const result = await pool.exec("processImage", vars as any);
       return {
-        [file]: {
-          ...image,
-          size: imageStats.size,
-          createdAt: imageStats.mtimeMs,
-        },
+        [vars[2]]: result,
       };
     });
-  return result.results.reduce((prev, result) => ({ ...prev, ...result }), {});
+  const result = await Promise.all(results);
+  await pool.terminate();
+  return result.reduce(
+    (prev: any, result: any) => ({ ...prev, ...result }),
+    {}
+  );
 };
+export type Sort = "created_at" | "numerical_file_name" | "file_name";
 
-export const getPhotos = async (): Promise<LoadedPhoto[]> => {
-  console.log("Loading previous JSON File");
-  const previousJSONFile = await getJSONFile();
-  console.log("previous JSON file exists: " + !!previousJSONFile);
-  const newJSONFile = await checkFiles(previousJSONFile);
-  await writeJSONFile(newJSONFile);
-  const files = sortFiles(sort, newJSONFile);
-  return reverse ? files.reverse() : files;
-};
-
-type Sort = "created_at" | "numerical_file_name" | "file_name";
 const sortFiles = (sort: Sort | string, file: JSONFile) => {
   if (sort === "file_name")
     return Object.entries(file)
@@ -123,4 +88,24 @@ const sortFiles = (sort: Sort | string, file: JSONFile) => {
       })
       .map(([_, file]) => file);
   return Object.values(file).sort((a, b) => a.createdAt - b.createdAt);
+};
+
+const appendDir = (file: JSONFile) => {
+  return Object.entries(file).reduce(
+    (prev, [key, value]) => ({
+      ...prev,
+      [key]: { ...value, src: `/photos/${key}` },
+    }),
+    {} as JSONFile
+  );
+};
+
+export const getPhotos = async (): Promise<LoadedPhoto[]> => {
+  console.log("Loading previous JSON File");
+  const previousJSONFile = await getJSONFile();
+  console.log("previous JSON file exists: " + !!previousJSONFile);
+  const newJSONFile = await checkFiles(previousJSONFile);
+  await writeJSONFile(newJSONFile);
+  const files = sortFiles(environment.photo.sort, appendDir(newJSONFile));
+  return environment.photo.defaultReverse ? files.reverse() : files;
 };
