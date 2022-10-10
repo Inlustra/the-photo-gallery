@@ -56,6 +56,7 @@ const FullScreenButton = styled.button`
   padding-left: 6px;
   padding-right: 6px;
   margin-bottom: 12px;
+  color: white;
   cursor: pointer;
   &:hover {
     background-color: white;
@@ -157,7 +158,7 @@ const Home: NextPage<HomeProps> = ({
     if (distanceToBottom < 800) loadMore();
   }, [x, y, loadMore]);
   return (
-    <div>
+    <div style={{ backgroundColor: "black" }}>
       <Head>
         <title>{title ?? "The Photo Gallery"}</title>
       </Head>
