@@ -1,34 +1,39 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# The Photo Gallery
+
+A simple, featureless (By design) full-width photo gallery.
+
+### Features
+- Full width photo display
+- Lightbox built-in
+- Automatic image optimization courtesy of NextJS and team
+- Generation of loading blurs
+- Server side rendered, once deployed to production, it's **quick**
+- Automatic dynamic regeneration should you edit/remove/add photos
+- Can handle hundreds (And thousands?) of images at a time
+- Lazy loading as you scroll
+- Full screen toggle
+- Image sorting
+  - Numerical file names (1.jpg, 2.jpg, 3.jpg...)
+  - Created time
+  - Regular file names (a.jpg, b.jpg...) (2022-10-09.jpg, 2022-10-10.jpg...)
+  - Reverse of any of the above!
 
 ## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
+### docker-compose.yml
+```yml
+version: "2.4"
+services:
+  thephotogallery:
+    container_name: thephotogallery
+    image: inlustra/the-photo-gallery:0.0.1
+    volumes:
+      - {YOUR_PHOTOS_DIRECTORY}:/app/public/photos:ro
+      - {A_STORAGE_LOCATION}:/app/storage
+    environment:
+      PAGE_TITLE: 'The Photo Gallery'
+      PAGE_HEADER_TEXT: 'Inlustra'
+      PAGE_SHOW_FULLSCREEN_BUTTON: 'true'
+      PHOTO_SORT: numerical_file_name
+      PHOTO_DEFAULT_REVERSE: 'false'
+    restart: unless-stopped
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
-
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
-
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.

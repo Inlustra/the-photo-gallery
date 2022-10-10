@@ -1,0 +1,18 @@
+version: "2.4"
+services:
+  thephotogallery:
+    container_name: thephotogallery
+    build:
+      context: .
+    ports:
+      - 3000:3000
+    volumes:
+      # - ./public/photos:/app/public/photos:ro
+      - ./storage:/app/storage
+    environment:
+      PAGE_TITLE: 'The Photo Gallery'
+      PAGE_HEADER_TEXT: 'Inlustra'
+      PAGE_SHOW_FULLSCREEN_BUTTON: 'true'
+      PHOTO_SORT: numerical_file_name
+      PHOTO_DEFAULT_REVERSE: 'false'
+    restart: unless-stopped

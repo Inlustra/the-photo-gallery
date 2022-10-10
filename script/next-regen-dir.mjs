@@ -6,7 +6,7 @@ const watcher = watch("./public/photos", {
   persistent: true,
 });
 
-function debounce(inner, ms = 0) {
+function debounce(inner, ms = 1000) {
   let timer = null;
   let resolves = [];
 
@@ -26,7 +26,7 @@ function debounce(inner, ms = 0) {
 }
 
 const secret = process.env.REGEN_SECRET;
-const regenURL = process.env.REGEN_URL ?? "http://localhost:3000/api/regen";
+const regenURL = process.env.REGEN_URL ?? "http://0.0.0.0:3000/api/regen";
 function regen() {
   const url = `${regenURL}${secret ? `?secret=${secret}` : ""}`;
   console.log(`Regenerating: ${url}`);
