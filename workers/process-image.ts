@@ -62,37 +62,31 @@ const getImageExtras = async (image: Buffer) => {
   };
 };
 
-async function processImage(
-  photosDir: string,
-  previousJSONFileStr: string,
-  imageFileName: string,
-  processingOptionsStr?: string
-) {
-  const processingOptions = processingOptionsStr
-    ? (JSON.parse(processingOptionsStr) as ProcessingOptions)
-    : undefined;
-  const previousJSONFile = previousJSONFileStr
-    ? (JSON.parse(previousJSONFileStr) as ProcessedPhoto)
-    : undefined;
-  const imagePath = path.join(photosDir, imageFileName);
-  return performProcessing(imagePath, previousJSONFile, processingOptions);
+export type ProcessImageConfig = {
+  imagePath: string;
+  cachedPhoto?: ProcessedPhoto;
+  processingOptions?: ProcessingOptions;
+};
+
+export async function processImage(configStr: string) {
+  const config: ProcessImageConfig = JSON.parse(configStr);
+  return performProcessing(config);
 }
 
-async function performProcessing(
-  imagePath: string,
-  previousJSONFile?: ProcessedPhoto,
-  processingOptions?: ProcessingOptions
-): Promise<ProcessedPhoto> {
+async function performProcessing({
+  imagePath,
+  cachedPhoto,
+  processingOptions,
+}: ProcessImageConfig): Promise<ProcessedPhoto> {
   const [fileDataError, fileData] = await to(getFileData(imagePath));
   if (fileDataError) {
     console.error(`Failed to load required file data for: ${imagePath}`);
     throw fileDataError;
   }
 
-  const canSkip =
-    previousJSONFile && fileData && previousJSONFile.size === fileData.size;
+  const canSkip = cachedPhoto && fileData && cachedPhoto.size === fileData.size;
   if (canSkip) {
-    return previousJSONFile;
+    return cachedPhoto;
   }
 
   const [fileError, file] = await to(readFile(imagePath));
@@ -121,7 +115,7 @@ async function performProcessing(
   }
 
   if (!imageExtras.blurDataURL || !processingOptions?.useThumbnails) {
-    const blurDataURL = await  getPlaiceholder(`/${imagePath}`, { dir: "." });
+    const blurDataURL = await getPlaiceholder(`/${imagePath}`, { dir: "." });
     imageExtras.blurDataURL = blurDataURL.base64;
   }
 

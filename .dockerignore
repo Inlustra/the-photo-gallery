@@ -8,3 +8,5 @@ README.md
 script/download.mjs
 docker-compose.yml
 ./example-photos
+storage/photos.json
+./public/photos/*
