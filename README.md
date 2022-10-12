@@ -46,7 +46,7 @@ version: "2.4"
 services:
   thephotogallery:
     container_name: thephotogallery
-    image: inlustra/the-photo-gallery:0.0.1
+    image: inlustra/the-photo-gallery:0.0.2
     ports:
       - 3000:3000
     volumes:
@@ -60,3 +60,18 @@ services:
       PHOTO_DEFAULT_REVERSE: 'false'
     restart: unless-stopped
 ```
+
+## Configuration
+The photo gallery is configured entirely with environment variables: 
+
+- `PHOTO_SORT`: How your photos should be sorted on the page, choice of:
+  - `image_taken_date`: (DEFAULT) Will sort by the date since the photos were taken, this uses EXIF data from the photo
+  - `file_name`: Sorts based on file name [a.jpg, b.jpg.... z.jpg]
+  - `numerical_file_name`: Sorts based on file name using numbers [1.jpg, 2.jpg... 99.jpg], this is particularly useful when your file names are not in a set string format [01.jpg, 02.jpg, 99.jpg]
+  - `modified_at`: Sort based on the last modification date of the photo
+- `PHOTO_DEFAULT_REVERSE`: Use this to reverse the sort methods above [z.jpg... b.jpg, a.jpg]
+- `PAGE_SHOW_FULLSCREEN_BUTTON`: Use this to show or hide the full screen button at the top of the page, choice of:
+  - `true`: (Default)
+  - `false`
+- `PAGE_TITLE`: The title of the page as appears in a tab
+- `PAGE_HEADER_TEXT`: The text that appears above the full screen button
