@@ -1,7 +1,6 @@
 import workerpool from "workerpool";
 import sizeOf from "image-size";
 import fs from "fs";
-import path from "path";
 import { promisify } from "util";
 import { getPlaiceholder } from "plaiceholder";
 import { load } from "exifreader";
@@ -19,6 +18,12 @@ export interface ProcessedPhoto {
   blurDataURL: string | null;
   dateTimeOriginalMs: number | null;
   src: string;
+}
+
+export interface ProcessedResult {
+  photo: ProcessedPhoto;
+  cached: boolean;
+  processTime: string;
 }
 
 export interface ProcessingOptions {
@@ -64,20 +69,28 @@ const getImageExtras = async (image: Buffer) => {
 
 export type ProcessImageConfig = {
   imagePath: string;
-  cachedPhoto?: ProcessedPhoto;
+  cachedPhoto?: Omit<ProcessedPhoto, "cached">;
   processingOptions?: ProcessingOptions;
 };
 
-export async function processImage(configStr: string) {
+export async function processImage(
+  configStr: string
+): Promise<ProcessedResult> {
   const config: ProcessImageConfig = JSON.parse(configStr);
-  return performProcessing(config);
+  const start = process.hrtime();
+  const result = await performProcessing(config);
+  var elapsed = process.hrtime(start)[1] / 1000000; // divide by a million to get nano to milli
+  const seconds = process.hrtime(start)[0];
+  const ms = elapsed.toFixed(0);
+  const elapsedTime = (seconds > 0 ? seconds + "s" : "") + ms + "ms"; // print message + time
+  return { ...result, processTime: elapsedTime };
 }
 
 async function performProcessing({
   imagePath,
   cachedPhoto,
   processingOptions,
-}: ProcessImageConfig): Promise<ProcessedPhoto> {
+}: ProcessImageConfig): Promise<Omit<ProcessedResult, "processTime">> {
   const [fileDataError, fileData] = await to(getFileData(imagePath));
   if (fileDataError) {
     console.error(`Failed to load required file data for: ${imagePath}`);
@@ -86,7 +99,7 @@ async function performProcessing({
 
   const canSkip = cachedPhoto && fileData && cachedPhoto.size === fileData.size;
   if (canSkip) {
-    return cachedPhoto;
+    return { photo: cachedPhoto, cached: true };
   }
 
   const [fileError, file] = await to(readFile(imagePath));
@@ -119,7 +132,15 @@ async function performProcessing({
     imageExtras.blurDataURL = blurDataURL.base64;
   }
 
-  return { src: imagePath, ...fileData, ...imageData, ...imageExtras };
+  return {
+    photo: {
+      src: imagePath,
+      ...fileData,
+      ...imageData,
+      ...imageExtras,
+    },
+    cached: false,
+  };
 }
 
 if (!workerpool.isMainThread) {

@@ -6,6 +6,7 @@ import workerPool from "workerpool";
 // Import this, not for it to do anything, but to ensure that nextjs keeps all of its dependencies
 import "../workers/process-image";
 import {
+  ProcessedResult,
   ProcessImageConfig,
   ProcessingOptions,
 } from "../workers/process-image";
@@ -70,11 +71,17 @@ const checkFiles = async (cache?: CachedPhotos) => {
       };
     })
     .map(async (config) => {
-      const result: ProcessedPhoto = await pool.exec("processImage", [
-        JSON.stringify(config),
-      ]);
+      const { cached, photo, processTime }: ProcessedResult = await pool.exec(
+        "processImage",
+        [JSON.stringify(config)]
+      );
+      console.log(
+        `Processed file ${photo.src} - ${photo.width}x${photo.height} ${
+          cached ? "(Cached)" : `(${processTime})`
+        }`
+      );
       return {
-        [config.imagePath]: result,
+        [config.imagePath]: photo,
       };
     });
   const result = await Promise.all(results);
@@ -92,7 +99,7 @@ export const getPhotos = async (): Promise<Record<string, ProcessedPhoto>> => {
   console.log(
     !!cacheFile
       ? `Cache file exists with ${
-          Object.entries(cacheFile.photos).length
+          Object.entries(cacheFile.photos ?? {}).length
         } entries`
       : "Cache file does not exist"
   );
