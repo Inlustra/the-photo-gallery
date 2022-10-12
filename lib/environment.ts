@@ -1,20 +1,16 @@
 import convict, { Path } from "convict";
 
-const schema = {
-  sort: {
-    doc: "Sort order for images",
-    format: ["numerical_file_name", "file_name", "created_at"] as const,
-    default: "created_at",
-    env: "SORT",
-  },
-} as const;
-
 const config = convict({
   photo: {
     sort: {
       doc: "Sort order for images",
-      format: ["numerical_file_name", "file_name", "created_at"] as const,
-      default: "created_at",
+      format: [
+        "numerical_file_name",
+        "file_name",
+        "modified_at",
+        "image_taken_date",
+      ] as const,
+      default: "image_taken_date",
       env: "PHOTO_SORT",
     },
     defaultReverse: {

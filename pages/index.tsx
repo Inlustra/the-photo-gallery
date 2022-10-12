@@ -10,10 +10,12 @@ import Lightbox from "react-image-lightbox";
 import useWindowScroll from "react-use/lib/useWindowScroll";
 import useMedia from "react-use/lib/useMedia";
 import "react-image-lightbox/style.css"; // This only needs to be imported once in your app
-import { getPhotos, LoadedPhoto } from "../lib/get-photos";
+import { getPhotos } from "../lib/get-photos";
 import Head from "next/head";
 import styled from "styled-components";
 import environment from "../lib/environment";
+import { getSortFunction } from "../lib/sort";
+import type { ProcessedPhoto } from "../workers/process-image";
 
 type Blur = { blurDataURL: string };
 
@@ -90,7 +92,7 @@ interface HomeProps {
   title: string;
   headerText: string | null;
   showFullscreenButton: boolean | null;
-  photos: LoadedPhoto[];
+  photos: ProcessedPhoto[];
 }
 
 const Home: NextPage<HomeProps> = ({
@@ -197,7 +199,11 @@ const Home: NextPage<HomeProps> = ({
 };
 
 export const getStaticProps: GetStaticProps<HomeProps> = async () => {
-  const photos = await getPhotos();
+  const photoMap = await getPhotos();
+  const sortFunction = getSortFunction(environment.photo.sort);
+  const photos = Object.values(photoMap)
+    .map(({ src, ...photo }) => ({ src: src.split('public')[1], ...photo }))
+    .sort(sortFunction);
   return {
     props: {
       title: environment.page.title,

@@ -1,11 +1,15 @@
 {
   "name": "the-photo-gallery",
-  "version": "0.1.0",
+  "version": "0.0.2",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev:next": "next dev",
+    "dev:workers": "tsc --project ./workers --watch",
+    "dev": "yarn dev:workers & yarn dev:next",
     "gen": "node ./script/generate.mjs",
-    "build": "next build",
+    "build:next": "next build",
+    "build:workers": "tsc --project ./workers",
+    "build": "yarn build:next && yarn build:workers",
     "start": "next start",
     "lint": "next lint"
   },
@@ -13,6 +17,9 @@
     "await-to-js": "^3.0.0",
     "chokidar": "^3.5.3",
     "convict": "^6.2.3",
+    "date-fns": "^2.29.3",
+    "exif-parser": "^0.1.12",
+    "exifreader": "^4.6.0",
     "image-size": "^1.0.2",
     "next": "12.3.1",
     "react": "18.2.0",
