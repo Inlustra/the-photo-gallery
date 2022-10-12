@@ -202,14 +202,14 @@ export const getStaticProps: GetStaticProps<HomeProps> = async () => {
   const photoMap = await getPhotos();
   const sortFunction = getSortFunction(environment.photo.sort);
   const photos = Object.values(photoMap)
-    .map(({ src, ...photo }) => ({ src: src.split('public')[1], ...photo }))
+    .map(({ src, ...photo }) => ({ src: src.split("public")[1], ...photo }))
     .sort(sortFunction);
   return {
     props: {
       title: environment.page.title,
       headerText: environment.page.headerText ?? null,
       showFullscreenButton: environment.page.showFullscreenButton ?? null,
-      photos,
+      photos: environment.photo.defaultReverse ? photos.reverse() : photos,
     },
   };
 };
