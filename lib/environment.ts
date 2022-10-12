@@ -19,6 +19,12 @@ const config = convict({
       format: Boolean,
       env: "PHOTO_DEFAULT_REVERSE",
     },
+    useEmbeddedThumbnails: {
+      doc: "During generation, if the photo has an embedded thumbnail, this can be used instead",
+      default: false,
+      format: Boolean,
+      env: "PHOTO_USE_EMBEDDED_THUMBNAILS"
+    }
   },
   page: {
     showFullscreenButton: {

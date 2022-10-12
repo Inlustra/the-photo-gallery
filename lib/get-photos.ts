@@ -5,15 +5,20 @@ import workerPool from "workerpool";
 
 // Import this, not for it to do anything, but to ensure that nextjs keeps all of its dependencies
 import "../workers/process-image";
-import { ProcessImageConfig } from "../workers/process-image";
+import {
+  ProcessImageConfig,
+  ProcessingOptions,
+} from "../workers/process-image";
 import type { ProcessedPhoto } from "../workers/process-image";
 import path from "path";
+import environment from "./environment";
 
 type CachedPhotos = Record<string, ProcessedPhoto>;
 
 type CacheFile = {
   photos: CachedPhotos;
   version: string;
+  processingOptions: ProcessingOptions;
 };
 
 const writeFile = promisify(fs.writeFile);
@@ -21,6 +26,9 @@ const readFile = promisify(fs.readFile);
 const readDir = promisify(fs.readdir);
 
 const photosDir = "./public/photos";
+const processingOptions = {
+  useThumbnails: environment.photo.useEmbeddedThumbnails,
+};
 
 const loadCacheFile = async (): Promise<CacheFile | undefined> => {
   const [fileError, file] = await to(readFile(`./storage/photos.json`));
@@ -58,6 +66,7 @@ const checkFiles = async (cache?: CachedPhotos) => {
       return {
         cachedPhoto: cache?.[imagePath], //[photosDir, previousJSON?.[photo], photo, { }]
         imagePath,
+        processingOptions,
       };
     })
     .map(async (config) => {
@@ -76,15 +85,33 @@ const checkFiles = async (cache?: CachedPhotos) => {
   );
 };
 
+const cacheVersion = "0.0.2";
 export const getPhotos = async (): Promise<Record<string, ProcessedPhoto>> => {
   console.log("Loading cache file...");
   const cacheFile = await loadCacheFile();
   console.log(
     !!cacheFile
-      ? `Cache file exists with ${Object.entries(cacheFile.photos).length} entries`
+      ? `Cache file exists with ${
+          Object.entries(cacheFile.photos).length
+        } entries`
       : "Cache file does not exist"
   );
-  const cachedPhotos = await checkFiles(cacheFile?.photos);
-  await writeCacheFile({ version: "0.0.2", photos: cachedPhotos });
+  const cacheVersionChanged = cacheFile?.version !== cacheVersion;
+  const processingOptionsChanged =
+    JSON.stringify(processingOptions).trim() !==
+    JSON.stringify(cacheFile?.processingOptions ?? "").trim();
+  const canUseCache = !cacheVersionChanged && !processingOptionsChanged;
+  if (!canUseCache)
+    console.warn(
+      "Processing options or cache file version are incompatible, regeneration needed, skipping cachefile."
+    );
+  const cachedPhotos = await checkFiles(
+    canUseCache ? cacheFile?.photos : undefined
+  );
+  await writeCacheFile({
+    version: cacheVersion,
+    processingOptions,
+    photos: cachedPhotos,
+  });
   return cachedPhotos;
 };
