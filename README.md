@@ -2,7 +2,6 @@
 
 A simple, featureless (By design) full-width photo gallery.
 
-
 ### Updates in v0.0.3
 - Imagor support
   - Allows us to support all file types (HEIC... etc)
@@ -11,7 +10,7 @@ A simple, featureless (By design) full-width photo gallery.
   - If you have thousands of photos, blurs can be expensive and not really necessary if you have a fast connection to the server
 - Directory support *(beta)*
   - You can now nest your photos in directories
-  - Just navigate to `/mydir` and the server will statically generate the page upon first load
+  - Just navigate to `/mydir` and the server will statically generate the photos within `/photos/mydir`
   - It's worth noting that the changing of images and having them dynamically update is not currently built-in
 
 
