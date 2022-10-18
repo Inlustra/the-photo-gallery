@@ -1,4 +1,4 @@
-import { ProcessedPhoto } from "../workers/process-image";
+import { FullPhoto } from "./processors/types";
 import path from "path";
 
 export type Sort =
@@ -7,7 +7,7 @@ export type Sort =
   | "file_name"
   | "image_taken_date";
 
-type SortFn = (a: ProcessedPhoto, b: ProcessedPhoto) => number;
+type SortFn = (a: FullPhoto, b: FullPhoto) => number;
 
 const fileNamePhotoSort: SortFn = ({ src: aSrc }, { src: bSrc }) =>
   aSrc.localeCompare(bSrc);
@@ -18,8 +18,8 @@ const numericalFileNamePhotoSort: SortFn = ({ src: aSrc }, { src: bSrc }) => {
   return parseInt(aFileName) - parseInt(bFileName);
 };
 const imageTakenDatePhotoSort: SortFn = (a, b) =>
-  (a.dateTimeOriginalMs ?? a.modifiedAt) -
-  (b.dateTimeOriginalMs ?? b.modifiedAt);
+  (a.dateTimeOriginalMs ?? a.fileSize) -
+  (b.dateTimeOriginalMs ?? b.fileSize);
 
 const modifiedAtPhotoSort: SortFn = (a, b) => a.modifiedAt - b.modifiedAt;
 

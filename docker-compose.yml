@@ -5,14 +5,41 @@ services:
     build:
       context: .
     ports:
-      - 3000:3000
+      - 2070:3000
     volumes:
-      - /mnt/user/Internal/next-photo-stream/example-photos:/app/public/photos:ro
-      - /mnt/user/Internal/next-photo-stream/storage:/app/storage
+      # - ${BASE_DIR}/favicon.ico:/app/public/favicon.ico:ro # Use this to replace the favicon
+      - ${BASE_DIR}/public/photos:/app/public/photos:ro
+      - ${BASE_DIR}/storage/cache:/app/storage
     environment:
       PAGE_TITLE: 'The Photo Gallery'
       PAGE_HEADER_TEXT: 'Inlustra'
-      PAGE_SHOW_FULLSCREEN_BUTTON: 'true'
-      PHOTO_SORT: numerical_file_name
+      PAGE_SHOW_FULLSCREEN_BUTTON: 'false'
       PHOTO_DEFAULT_REVERSE: 'false'
+      PHOTO_USE_EMBEDDED_THUMBNAILS: 'false'
+      IMAGOR_SERVER_BASE_URL: 'http://imagor:8000' # Uses Imagor internal docker port
+      IMAGOR_CLIENT_BASE_URL: 'http://localhost:4567' # Uses Imagor external docker port
+    depends_on:
+      - imagor
     restart: unless-stopped
+
+  imagor:
+    image: shumc/imagor:latest
+    volumes:
+      - ${BASE_DIR}/public/photos:/mnt/public/photos
+      - ${BASE_DIR}/storage/imagor:/mnt/result
+    environment:
+      PORT: 8000
+      IMAGOR_UNSAFE: 1 # unsafe URL for testing
+      
+      # Keep the next 2 the same to ensure that we don't store duplicates of the images within Imagor
+      FILE_LOADER_BASE_DIR: /mnt/public # enable file loader by specifying base dir
+      FILE_STORAGE_BASE_DIR: /mnt/public # enable file storage by specifying base dir
+
+      FILE_STORAGE_MKDIR_PERMISSION: 0755
+      FILE_STORAGE_WRITE_PERMISSION: 0666
+
+      FILE_RESULT_STORAGE_BASE_DIR: /mnt/result # This is the cache storage folder
+      FILE_RESULT_STORAGE_MKDIR_PERMISSION: 0755
+      FILE_RESULT_STORAGE_WRITE_PERMISSION: 0666
+    ports:
+      - "4567:8000"

@@ -5,41 +5,15 @@ import { promisify } from "util";
 import { getPlaiceholder } from "plaiceholder";
 import { load } from "exifreader";
 import to from "await-to-js";
-import parseDate from "date-fns/parse";
+import path from "path";
+import { parseDateTimeOriginal } from "../lib/utils";
+
+import type {
+  ProcessImageConfig,
+  ProcessedResult,
+} from "../lib/processors/types";
 
 const readFile = promisify(fs.readFile);
-const stat = promisify(fs.stat);
-
-export interface ProcessedPhoto {
-  height: number;
-  width: number;
-  size: number;
-  modifiedAt: number;
-  blurDataURL: string | null;
-  dateTimeOriginalMs: number | null;
-  src: string;
-}
-
-export interface ProcessedResult {
-  photo: ProcessedPhoto;
-  cached: boolean;
-  processTime: string;
-}
-
-export interface ProcessingOptions {
-  useThumbnails?: boolean;
-}
-
-const getFileData = async (filePath: string) => {
-  const [fileStatsError, fileStats] = await to(stat(filePath));
-  if (fileStatsError || !fileStats) {
-    throw fileStatsError;
-  }
-  return {
-    modifiedAt: fileStats.mtimeMs,
-    size: fileStats.size,
-  };
-};
 
 const getImageData = async (image: Buffer) => {
   const imageSize = sizeOf(image);
@@ -58,19 +32,9 @@ const getImageExtras = async (image: Buffer) => {
   return {
     blurDataURL: thumbnail ? `data:image/jpg;base64,${thumbnail}` : null,
     dateTimeOriginalMs: dateTimeOriginal
-      ? parseDate(
-          dateTimeOriginal,
-          "yyyy:MM:dd HH:mm:ss",
-          new Date(0)
-        ).getTime() //2022:09:03 09:44:55
+      ? parseDateTimeOriginal(dateTimeOriginal) //2022:09:03 09:44:55
       : null,
   };
-};
-
-export type ProcessImageConfig = {
-  imagePath: string;
-  cachedPhoto?: Omit<ProcessedPhoto, "cached">;
-  processingOptions?: ProcessingOptions;
 };
 
 export async function processImage(
@@ -86,18 +50,22 @@ export async function processImage(
   return { ...result, processTime: elapsedTime };
 }
 
+const allowedExtensions = [".jpg", ".jpeg", ".png"];
+
 async function performProcessing({
   imagePath,
   cachedPhoto,
   processingOptions,
+  stats,
 }: ProcessImageConfig): Promise<Omit<ProcessedResult, "processTime">> {
-  const [fileDataError, fileData] = await to(getFileData(imagePath));
-  if (fileDataError) {
-    console.error(`Failed to load required file data for: ${imagePath}`);
-    throw fileDataError;
+  const { ext } = path.parse(imagePath);
+  if (!allowedExtensions.some((allowed) => allowed === ext)) {
+    console.warn(
+      `File type not supported [${ext}] for file: ${imagePath}, consider using Imagor if this is a valid image. Skipping...`
+    );
+    return { cached: false, photo: null };
   }
-
-  const canSkip = cachedPhoto && fileData && cachedPhoto.size === fileData.size;
+  const canSkip = cachedPhoto && cachedPhoto.fileSize === stats.fileSize;
   if (canSkip) {
     return { photo: cachedPhoto, cached: true };
   }
@@ -134,8 +102,7 @@ async function performProcessing({
 
   return {
     photo: {
-      src: imagePath,
-      ...fileData,
+      thumbnailSrc: null,
       ...imageData,
       ...imageExtras,
     },

@@ -1,20 +1,20 @@
 import fs from "fs";
 import { promisify } from "util";
 import to from "await-to-js";
-import workerPool from "workerpool";
 
-// Import this, not for it to do anything, but to ensure that nextjs keeps all of its dependencies
-import "../workers/process-image";
 import {
-  ProcessedResult,
+  FileStats,
+  FullPhoto,
+  ImageProcessor,
   ProcessImageConfig,
   ProcessingOptions,
-} from "../workers/process-image";
-import type { ProcessedPhoto } from "../workers/process-image";
+} from "./processors/types";
 import path from "path";
 import environment from "./environment";
+import { createWorkerImageProcessor } from "./processors/node-worker";
+import { createImagorProcessor } from "./processors/imagor";
 
-type CachedPhotos = Record<string, ProcessedPhoto>;
+type CachedPhotos = Record<string, FullPhoto>;
 
 type CacheFile = {
   photos: CachedPhotos;
@@ -25,14 +25,38 @@ type CacheFile = {
 const writeFile = promisify(fs.writeFile);
 const readFile = promisify(fs.readFile);
 const readDir = promisify(fs.readdir);
+const stat = promisify(fs.stat);
 
 const photosDir = "./public/photos";
 const processingOptions = {
-  useThumbnails: environment.photo.useEmbeddedThumbnails,
+  useThumbnails: environment.processors.node.useEmbeddedThumbnails,
+  disableBlurGeneration: environment.processors.node.disableBlurGeneration,
 };
 
-const loadCacheFile = async (): Promise<CacheFile | undefined> => {
-  const [fileError, file] = await to(readFile(`./storage/photos.json`));
+const getFileStats = async (filePath: string): Promise<FileStats> => {
+  const [fileStatsError, fileStats] = await to(stat(filePath));
+  if (fileStatsError || !fileStats) {
+    throw fileStatsError;
+  }
+  return {
+    modifiedAt: fileStats.mtimeMs,
+    fileSize: fileStats.size,
+  };
+};
+
+const getCacheFilePath = (directory?: string) =>
+  path.join(
+    ".",
+    "storage",
+    directory ? `photos-${encodeURIComponent(directory)}.json` : "photos.json"
+  );
+
+const loadCacheFile = async (
+  directory: string | undefined
+): Promise<CacheFile | undefined> => {
+  const cacheFilePath = getCacheFilePath(directory);
+  console.log(cacheFilePath);
+  const [fileError, file] = await to(readFile(cacheFilePath));
   if (fileError) {
     console.log(fileError);
     return;
@@ -41,61 +65,83 @@ const loadCacheFile = async (): Promise<CacheFile | undefined> => {
   return json;
 };
 
-const writeCacheFile = async (file: CacheFile) => {
-  const [error] = await to(
-    writeFile("./storage/photos.json", JSON.stringify(file))
-  );
+const writeCacheFile = async (
+  directory: string | undefined,
+  file: CacheFile
+) => {
+  const cacheFilePath = getCacheFilePath(directory);
+  console.log(cacheFilePath);
+  const [error] = await to(writeFile(cacheFilePath, JSON.stringify(file)));
   if (error) console.error(error);
 };
 
-const allowedFileTypes = [".jpg", ".png"];
-
-const checkFiles = async (cache?: CachedPhotos) => {
-  const [dirError, dir] = await to(readDir(photosDir));
+const processFiles = async (
+  directory: string | undefined,
+  processor: ImageProcessor,
+  cache?: CachedPhotos
+) => {
+  const fullPath = directory ? path.join(photosDir, directory) : photosDir;
+  const [dirError, dir] = await to(readDir(fullPath, { withFileTypes: true }));
   if (dirError) {
-    console.error("Error reading the photos directory", photosDir);
+    console.error("Error reading the photos directory", fullPath);
     throw dirError;
   }
-  const allowedPhotos = dir.filter((file) =>
-    allowedFileTypes.some((ext) => file.toLowerCase().endsWith(ext))
+
+  const paths = dir
+    .filter((dirent) => dirent.isFile())
+    .map((dirent) => dirent.name)
+    .map((photo) => path.join(fullPath, photo));
+
+  const fileStats = (
+    await Promise.all(
+      paths.map(async (photo): Promise<[string, FileStats]> => {
+        const fileData = await getFileStats(photo);
+        return [photo, fileData];
+      })
+    )
+  ).reduce(
+    (prev, [key, stats]) => ({ ...prev, [key]: stats }),
+    {} as { [key: string]: FileStats }
   );
 
-  const pool = workerPool.pool(`./workers/process-image.js`);
-  const results = allowedPhotos
-    .map((photo): ProcessImageConfig => {
-      const imagePath = path.join(photosDir, photo);
-      return {
-        cachedPhoto: cache?.[imagePath], //[photosDir, previousJSON?.[photo], photo, { }]
-        imagePath,
-        processingOptions,
-      };
-    })
-    .map(async (config) => {
-      const { cached, photo, processTime }: ProcessedResult = await pool.exec(
-        "processImage",
-        [JSON.stringify(config)]
-      );
-      console.log(
-        `Processed file ${photo.src} - ${photo.width}x${photo.height} ${
-          cached ? "(Cached)" : `(${processTime})`
-        }`
-      );
-      return {
-        [config.imagePath]: photo,
-      };
-    });
-  const result = await Promise.all(results);
-  await pool.terminate();
-  return result.reduce(
-    (prev, result) => ({ ...prev, ...result }),
-    {} as CachedPhotos
-  );
+  const configs = paths.map((imagePath): ProcessImageConfig => {
+    return {
+      cachedPhoto: cache?.[imagePath],
+      imagePath,
+      processingOptions,
+      stats: fileStats[imagePath],
+    };
+  });
+
+  const result = await processor(configs);
+  return Object.entries(result).reduce((prev, [imagePath, result]) => {
+    if (!result.photo) return prev;
+    return {
+      ...prev,
+      [imagePath]: {
+        ...result.photo,
+        src: imagePath.split("public")[1],
+        ...fileStats[imagePath],
+      },
+    };
+  }, {} as CachedPhotos);
 };
 
 const cacheVersion = "0.0.2";
-export const getPhotos = async (): Promise<Record<string, ProcessedPhoto>> => {
+
+export const getPhotos = async (
+  directory: string | string[] | undefined
+): Promise<Record<string, FullPhoto>> => {
+  const normalizedDirectory = directory
+    ? typeof directory === "string"
+      ? directory
+      : Array.isArray(directory)
+      ? path.join(...directory)
+      : undefined
+    : undefined;
+
   console.log("Loading cache file...");
-  const cacheFile = await loadCacheFile();
+  const cacheFile = await loadCacheFile(normalizedDirectory);
   console.log(
     !!cacheFile
       ? `Cache file exists with ${
@@ -112,10 +158,16 @@ export const getPhotos = async (): Promise<Record<string, ProcessedPhoto>> => {
     console.warn(
       "Processing options or cache file version are incompatible, regeneration needed, skipping cachefile."
     );
-  const cachedPhotos = await checkFiles(
+
+  const processor = environment.processors.imagor.serverURL
+    ? createImagorProcessor()
+    : createWorkerImageProcessor();
+  const cachedPhotos = await processFiles(
+    normalizedDirectory,
+    processor,
     canUseCache ? cacheFile?.photos : undefined
   );
-  await writeCacheFile({
+  await writeCacheFile(normalizedDirectory, {
     version: cacheVersion,
     processingOptions,
     photos: cachedPhotos,

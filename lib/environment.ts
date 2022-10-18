@@ -1,6 +1,6 @@
-import convict, { Path } from "convict";
+import convict from "convict";
 
-const config = convict({
+export const schema = {
   photo: {
     sort: {
       doc: "Sort order for images",
@@ -9,7 +9,7 @@ const config = convict({
         "file_name",
         "modified_at",
         "image_taken_date",
-      ] as const,
+      ],
       default: "image_taken_date",
       env: "PHOTO_SORT",
     },
@@ -19,12 +19,54 @@ const config = convict({
       format: Boolean,
       env: "PHOTO_DEFAULT_REVERSE",
     },
-    useEmbeddedThumbnails: {
-      doc: "During generation, if the photo has an embedded thumbnail, this can be used instead",
-      default: false,
-      format: Boolean,
-      env: "PHOTO_USE_EMBEDDED_THUMBNAILS"
-    }
+  },
+  processors: {
+    node: {
+      useEmbeddedThumbnails: {
+        doc: "During generation, if the photo has an embedded thumbnail, this can be used instead a blur",
+        default: false,
+        format: Boolean,
+        env: "NODE_USE_EMBEDDED_THUMBNAILS",
+      },
+      disableBlurGeneration: {
+        doc: "Disable the blur generation, will significantly speed up build. Not recommended but required for *very* large directories.",
+        default: false,
+        format: Boolean,
+        env: "NODE_DISABLE_BLUR_GENERATION",
+      },
+    },
+    imagor: {
+      serverURL: {
+        default: null as string | null,
+        format: "*",
+        env: "IMAGOR_SERVER_BASE_URL",
+        doc: "The Imagor base url for the container to fetch metadata, e.g for docker: http://imagor:8000/",
+      },
+      clientURL: {
+        default: null as string | null,
+        format: "*",
+        doc: "The Imagor base url for the client to fetch images, e.g for docker with exposed port: http://localhost:8000/",
+        env: "IMAGOR_CLIENT_BASE_URL",
+      },
+      secret: {
+        default: null as string | null,
+        doc: "Set this if you have set the IMAGOR_SECRET environment variable within imagor",
+        format: "*",
+        env: "IMAGOR_SECRET",
+      },
+      imageFormat: {
+        default: "webp",
+        format: ["jpeg", "png", "gif", "webp", "tiff", "avif"],
+        doc: "Image format to be requested by Imagor, defaults to webp",
+        env: "IMAGOR_IMAGE_FORMAT",
+      },
+      imageFilters: {
+        default: "",
+        format: String,
+        doc: "Any extra image filters to be requested by imagor, must start with: ':', example: ':hue(290):saturation(100)'",
+        env: "IMAGOR_IMAGE_FILTERS",
+      },
+    },
   },
   page: {
     showFullscreenButton: {
@@ -37,15 +79,19 @@ const config = convict({
       default: "The Photo Gallery",
       format: String,
       env: "PAGE_TITLE",
+      doc: "Title that appears in the tab in your browser",
     },
     headerText: {
       default: undefined,
       nullable: true,
       format: String,
       env: "PAGE_HEADER_TEXT",
+      doc: "Text at the top of the screen",
     },
   },
-} as const);
+} as const
+
+export const config = convict(schema);
 
 config.validate({ allowed: "strict" });
 

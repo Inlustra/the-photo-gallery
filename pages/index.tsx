@@ -1,7 +1,6 @@
 import type { GetStaticProps, NextPage } from "next";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import Gallery, {
-  PhotoProps,
   PhotoClickHandler,
   RenderImageProps,
 } from "react-photo-gallery";
@@ -15,7 +14,7 @@ import Head from "next/head";
 import styled from "styled-components";
 import environment from "../lib/environment";
 import { getSortFunction } from "../lib/sort";
-import type { ProcessedPhoto } from "../workers/process-image";
+import type { FullPhoto } from "../lib/processors/types";
 
 type Blur = { blurDataURL: string };
 
@@ -66,7 +65,7 @@ const FullScreenButton = styled.button`
   }
 `;
 
-const Photo: React.FC<RenderImageProps<PhotoProps & Blur>> = ({
+const Photo: React.FC<RenderImageProps<FullPhoto>> = ({
   photo,
   onClick,
   index,
@@ -75,14 +74,25 @@ const Photo: React.FC<RenderImageProps<PhotoProps & Blur>> = ({
     <PhotoContainer onClick={(evt) => onClick?.(evt, { index, ...photo })}>
       <ImageC
         key={`photo-${index}`}
-        src={photo.src}
+        src={photo.thumbnailSrc ?? photo.src}
         width={photo.width}
         height={photo.height}
-        blurDataURL={photo.blurDataURL}
-        placeholder="blur"
+        blurDataURL={photo.blurDataURL ?? undefined}
+        placeholder={photo.blurDataURL ? "blur" : "empty"}
         alt="photo"
         className="photo"
         style={{ height: "100%" }}
+        loader={
+          photo.thumbnailSrc
+            ? ({ src, width }) =>
+                src
+                  .replace("WIDTH_VAR", Math.ceil(width).toString())
+                  .replace(
+                    "HEIGHT_VAR",
+                    Math.ceil(photo.height / (photo.width / width)).toString()
+                  )
+            : undefined
+        }
       />
     </PhotoContainer>
   );
@@ -92,10 +102,10 @@ interface HomeProps {
   title: string;
   headerText: string | null;
   showFullscreenButton: boolean | null;
-  photos: ProcessedPhoto[];
+  photos: FullPhoto[];
 }
 
-const Home: NextPage<HomeProps> = ({
+export const Home: NextPage<HomeProps> = ({
   photos,
   title,
   headerText,
@@ -198,12 +208,10 @@ const Home: NextPage<HomeProps> = ({
   );
 };
 
-export const getStaticProps: GetStaticProps<HomeProps> = async () => {
-  const photoMap = await getPhotos();
+export const getStaticProps: GetStaticProps<HomeProps> = async (ctx) => {
+  const photoMap = await getPhotos(ctx?.params?.dir);
   const sortFunction = getSortFunction(environment.photo.sort);
-  const photos = Object.values(photoMap)
-    .map(({ src, ...photo }) => ({ src: src.split("public")[1], ...photo }))
-    .sort(sortFunction);
+  const photos = Object.values(photoMap).sort(sortFunction);
   return {
     props: {
       title: environment.page.title,

@@ -49,7 +49,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/entrypoint.sh ./entrypoint.sh
 COPY --from=builder --chown=nextjs:nodejs /app/script/next-regen-dir.mjs ./script/next-regen-dir.mjs
-COPY --from=builder --chown=nextjs:nodejs /app/workers/*.js ./workers/
+COPY --from=builder --chown=nextjs:nodejs /app/workers-build ./workers-build
 
 USER nextjs
 
