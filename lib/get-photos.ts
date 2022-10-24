@@ -13,17 +13,10 @@ import path from "path";
 import environment from "./environment";
 import { createWorkerImageProcessor } from "./processors/node-worker";
 import { createImagorProcessor } from "./processors/imagor";
+import { Logger } from "winston";
+import { LoggerConfig } from "./create-logger";
+import { CachedPhotos, loadCacheFile, writeCacheFile } from "./cache-file";
 
-type CachedPhotos = Record<string, FullPhoto>;
-
-type CacheFile = {
-  photos: CachedPhotos;
-  version: string;
-  processingOptions: ProcessingOptions;
-};
-
-const writeFile = promisify(fs.writeFile);
-const readFile = promisify(fs.readFile);
 const readDir = promisify(fs.readdir);
 const stat = promisify(fs.stat);
 
@@ -31,7 +24,7 @@ const photosDir = "./public/photos";
 const processingOptions = {
   useThumbnails: environment.processors.node.useEmbeddedThumbnails,
   disableBlurGeneration: environment.processors.node.disableBlurGeneration,
-};
+} as ProcessingOptions;
 
 const getFileStats = async (filePath: string): Promise<FileStats> => {
   const [fileStatsError, fileStats] = await to(stat(filePath));
@@ -44,38 +37,9 @@ const getFileStats = async (filePath: string): Promise<FileStats> => {
   };
 };
 
-const getCacheFilePath = (directory?: string) =>
-  path.join(
-    ".",
-    "storage",
-    directory ? `photos-${encodeURIComponent(directory)}.json` : "photos.json"
-  );
-
-const loadCacheFile = async (
-  directory: string | undefined
-): Promise<CacheFile | undefined> => {
-  const cacheFilePath = getCacheFilePath(directory);
-  console.log(cacheFilePath);
-  const [fileError, file] = await to(readFile(cacheFilePath));
-  if (fileError) {
-    console.log(fileError);
-    return;
-  }
-  const json = JSON.parse(file.toString());
-  return json;
-};
-
-const writeCacheFile = async (
-  directory: string | undefined,
-  file: CacheFile
-) => {
-  const cacheFilePath = getCacheFilePath(directory);
-  console.log(cacheFilePath);
-  const [error] = await to(writeFile(cacheFilePath, JSON.stringify(file)));
-  if (error) console.error(error);
-};
-
 const processFiles = async (
+  logger: Logger,
+  loggerConfig: LoggerConfig,
   directory: string | undefined,
   processor: ImageProcessor,
   cache?: CachedPhotos
@@ -83,7 +47,11 @@ const processFiles = async (
   const fullPath = directory ? path.join(photosDir, directory) : photosDir;
   const [dirError, dir] = await to(readDir(fullPath, { withFileTypes: true }));
   if (dirError) {
-    console.error("Error reading the photos directory", fullPath);
+    logger.error("Error reading the photos directory", {
+      photosDir,
+      directory,
+      fullPath,
+    });
     throw dirError;
   }
 
@@ -106,6 +74,7 @@ const processFiles = async (
 
   const configs = paths.map((imagePath): ProcessImageConfig => {
     return {
+      loggerConfig,
       cachedPhoto: cache?.[imagePath],
       imagePath,
       processingOptions,
@@ -113,13 +82,37 @@ const processFiles = async (
     };
   });
 
-  const result = await processor(configs);
-  return Object.entries(result).reduce((prev, [imagePath, result]) => {
-    if (!result.photo) return prev;
+  let completed = 0;
+
+  const results = await processor(logger, configs);
+
+  const awaitedResults = results.map(async (promise) => {
+    const result = await promise;
+    const percentageCompleted = `[${Math.ceil(
+      (++completed / configs.length) * 100
+    )}%]`;
+    if (result.photo) {
+      logger.info(
+        `${percentageCompleted} Processed file ${result.imagePath} - ${
+          result.photo.width
+        }x${result.photo.height} ${result.cached ? "(Cached)" : ``}`
+      );
+    } else {
+      logger.info(
+        `${percentageCompleted} Processed file ${result.imagePath} - Not generated`
+      );
+    }
+    return result;
+  });
+
+  const result = await Promise.all(awaitedResults);
+
+  return result.reduce((prev, { photo, imagePath }) => {
+    if (!photo) return prev;
     return {
       ...prev,
       [imagePath]: {
-        ...result.photo,
+        ...photo,
         src: imagePath.split("public")[1],
         ...fileStats[imagePath],
       },
@@ -127,10 +120,11 @@ const processFiles = async (
   }, {} as CachedPhotos);
 };
 
-const cacheVersion = "0.0.2";
-
 export const getPhotos = async (
-  directory: string | string[] | undefined
+  logger: Logger,
+  processorLoggerConfig: LoggerConfig,
+  directory: string | string[] | undefined,
+  regenerate?: boolean
 ): Promise<Record<string, FullPhoto>> => {
   const normalizedDirectory = directory
     ? typeof directory === "string"
@@ -140,35 +134,33 @@ export const getPhotos = async (
       : undefined
     : undefined;
 
-  console.log("Loading cache file...");
-  const cacheFile = await loadCacheFile(normalizedDirectory);
-  console.log(
-    !!cacheFile
-      ? `Cache file exists with ${
-          Object.entries(cacheFile.photos ?? {}).length
-        } entries`
-      : "Cache file does not exist"
-  );
-  const cacheVersionChanged = cacheFile?.version !== cacheVersion;
+  const cacheFile = regenerate
+    ? undefined
+    : await loadCacheFile(logger, normalizedDirectory);
   const processingOptionsChanged =
     JSON.stringify(processingOptions).trim() !==
     JSON.stringify(cacheFile?.processingOptions ?? "").trim();
-  const canUseCache = !cacheVersionChanged && !processingOptionsChanged;
+  const canUseCache = !processingOptionsChanged && !regenerate;
   if (!canUseCache)
-    console.warn(
-      "Processing options or cache file version are incompatible, regeneration needed, skipping cachefile."
-    );
+    logger.info(`Skipping cache file.`, {
+      cacheFileExists: !!cacheFile,
+      processingOptionsChanged,
+      regenerate,
+    });
+  logger.info("Starting file processing... (This can take awhile)");
 
-  const processor = environment.processors.imagor.serverURL
-    ? createImagorProcessor()
-    : createWorkerImageProcessor();
+  const processorFactory = environment.processors.imagor.serverURL
+    ? createImagorProcessor
+    : createWorkerImageProcessor;
+
   const cachedPhotos = await processFiles(
+    logger,
+    processorLoggerConfig,
     normalizedDirectory,
-    processor,
+    processorFactory,
     canUseCache ? cacheFile?.photos : undefined
   );
-  await writeCacheFile(normalizedDirectory, {
-    version: cacheVersion,
+  await writeCacheFile(logger, normalizedDirectory, {
     processingOptions,
     photos: cachedPhotos,
   });

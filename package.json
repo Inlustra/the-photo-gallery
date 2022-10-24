@@ -30,6 +30,8 @@
     "react-photo-gallery": "^8.0.0",
     "react-use": "^17.4.0",
     "styled-components": "^5.3.6",
+    "winston": "^3.8.2",
+    "winston-console-format": "^1.0.8",
     "workerpool": "^6.2.1"
   },
   "devDependencies": {

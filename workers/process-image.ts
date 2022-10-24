@@ -12,6 +12,7 @@ import type {
   ProcessImageConfig,
   ProcessedResult,
 } from "../lib/processors/types";
+import { createLogger } from "../lib/create-logger";
 
 const readFile = promisify(fs.readFile);
 
@@ -25,12 +26,15 @@ const getImageData = async (image: Buffer) => {
   };
 };
 
-const getImageExtras = async (image: Buffer) => {
+const getImageExtras = async (useThumbnails: boolean, image: Buffer) => {
   const exif = load(image);
-  const thumbnail = exif["Thumbnail"]?.base64;
+  let blurDataURL = null;
+  if (useThumbnails) {
+    blurDataURL = `data:image/jpg;base64,${exif["Thumbnail"]?.base64}`;
+  }
   const dateTimeOriginal = exif["DateTimeOriginal"]?.value?.[0];
   return {
-    blurDataURL: thumbnail ? `data:image/jpg;base64,${thumbnail}` : null,
+    blurDataURL,
     dateTimeOriginalMs: dateTimeOriginal
       ? parseDateTimeOriginal(dateTimeOriginal) //2022:09:03 09:44:55
       : null,
@@ -41,66 +45,50 @@ export async function processImage(
   configStr: string
 ): Promise<ProcessedResult> {
   const config: ProcessImageConfig = JSON.parse(configStr);
-  const start = process.hrtime();
-  const result = await performProcessing(config);
-  var elapsed = process.hrtime(start)[1] / 1000000; // divide by a million to get nano to milli
-  const seconds = process.hrtime(start)[0];
-  const ms = elapsed.toFixed(0);
-  const elapsedTime = (seconds > 0 ? seconds + "s" : "") + ms + "ms"; // print message + time
-  return { ...result, processTime: elapsedTime };
+  return await performProcessing(config);
 }
 
-const allowedExtensions = [".jpg", ".jpeg", ".png"];
-
 async function performProcessing({
+  loggerConfig,
   imagePath,
-  cachedPhoto,
   processingOptions,
-  stats,
-}: ProcessImageConfig): Promise<Omit<ProcessedResult, "processTime">> {
-  const { ext } = path.parse(imagePath);
-  if (!allowedExtensions.some((allowed) => allowed === ext)) {
-    console.warn(
-      `File type not supported [${ext}] for file: ${imagePath}, consider using Imagor if this is a valid image. Skipping...`
-    );
-    return { cached: false, photo: null };
-  }
-  const canSkip = cachedPhoto && cachedPhoto.fileSize === stats.fileSize;
-  if (canSkip) {
-    return { photo: cachedPhoto, cached: true };
-  }
+}: ProcessImageConfig): Promise<ProcessedResult> {
+  const logger = createLogger(loggerConfig);
 
   const [fileError, file] = await to(readFile(imagePath));
 
   if (fileError || !file) {
-    console.error(`Failed to load file for: ${imagePath}`, fileError);
+    logger.error(`Failed to load file for: ${imagePath}`, fileError);
     throw fileError;
   }
 
   const [imageDataError, imageData] = await to(getImageData(file));
   if (imageDataError) {
-    console.error(
+    logger.error(
       `Failed to load required image data for: ${imagePath}`,
       imageDataError
     );
     throw imageDataError;
   }
 
-  const [imageExtrasError, imageExtras] = await to(getImageExtras(file));
+  const [imageExtrasError, imageExtras] = await to(
+    getImageExtras(!!processingOptions?.useThumbnails, file)
+  );
   if (imageExtrasError) {
-    console.warn(
+    logger.warn(
       `Failed to load extra data for: ${imagePath}`,
       imageExtrasError
     );
     throw imageExtrasError;
   }
 
-  if (!imageExtras.blurDataURL || !processingOptions?.useThumbnails) {
+  if (!imageExtras.blurDataURL && !processingOptions?.disableBlurGeneration) {
     const blurDataURL = await getPlaiceholder(`/${imagePath}`, { dir: "." });
     imageExtras.blurDataURL = blurDataURL.base64;
   }
 
   return {
+    imagePath,
     photo: {
       thumbnailSrc: null,
       ...imageData,

@@ -2,6 +2,12 @@
 
 A simple, featureless (By design) full-width photo gallery.
 
+
+### Updates in v0.0.4
+
+- Allow the regen api to regenerate specific directories
+  - You can POST or GET (Or just load) the regen api url and have the server immediately regenerate.
+
 ### Updates in v0.0.3
 
 - Imagor support
@@ -69,7 +75,7 @@ version: "2.4"
 services:
   thephotogallery:
     container_name: thephotogallery
-    image: inlustra/the-photo-gallery:0.0.3
+    image: inlustra/the-photo-gallery:0.0.4
     ports:
       - 3000:3000
     volumes:
@@ -142,7 +148,7 @@ version: "2.4"
 services:
   thephotogallery:
     container_name: thephotogallery
-    image: inlustra/the-photo-gallery:0.0.3
+    image: inlustra/the-photo-gallery:0.0.4
     ports:
       - 2070:3000
     volumes:

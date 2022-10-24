@@ -1,6 +1,18 @@
 import convict from "convict";
 
 export const schema = {
+  logLevel: {
+    doc: "The level of logging required",
+    default: "info",
+    format: ["silly", "verbose", "debug", "info", "warn", "error"],
+    env: "LOG_LEVEL",
+  },
+  disableCache: {
+    doc: 'Regenerate on every render',
+    default: false,
+    format: Boolean,
+    env: 'DISABLE_CACHE'
+  },
   photo: {
     sort: {
       doc: "Sort order for images",
@@ -53,6 +65,7 @@ export const schema = {
         doc: "Set this if you have set the IMAGOR_SECRET environment variable within imagor",
         format: "*",
         env: "IMAGOR_SECRET",
+        sensitive: true,
       },
       imageFormat: {
         default: "webp",
@@ -89,14 +102,10 @@ export const schema = {
       doc: "Text at the top of the screen",
     },
   },
-} as const
+} as const;
 
 export const config = convict(schema);
 
-config.validate({ allowed: "strict" });
-
 const result = config.get();
-
-console.debug(result);
 
 export default result;

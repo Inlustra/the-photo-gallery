@@ -15,6 +15,7 @@ import styled from "styled-components";
 import environment from "../lib/environment";
 import { getSortFunction } from "../lib/sort";
 import type { FullPhoto } from "../lib/processors/types";
+import { createLogger, LoggerConfig } from "../lib/create-logger";
 
 type Blur = { blurDataURL: string };
 
@@ -209,7 +210,14 @@ export const Home: NextPage<HomeProps> = ({
 };
 
 export const getStaticProps: GetStaticProps<HomeProps> = async (ctx) => {
-  const photoMap = await getPhotos(ctx?.params?.dir);
+  const loggerConfig: LoggerConfig = { level: environment.logLevel };
+  const logger = createLogger(loggerConfig);
+  const photoMap = await getPhotos(
+    logger,
+    loggerConfig,
+    ctx?.params?.dir,
+    environment.disableCache
+  );
   const sortFunction = getSortFunction(environment.photo.sort);
   const photos = Object.values(photoMap).sort(sortFunction);
   return {

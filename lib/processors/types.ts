@@ -1,3 +1,6 @@
+import { Logger } from "winston";
+import { LoggerConfig } from "../create-logger";
+
 export interface ProcessedPhoto {
   height: number;
   width: number;
@@ -16,16 +19,18 @@ export interface FullPhoto extends ProcessedPhoto, FileStats {
 }
 
 export interface ProcessedResult {
+  imagePath: string;
   photo: ProcessedPhoto | null;
   cached: boolean;
-  processTime: string;
 }
 
 export interface ProcessingOptions {
   useThumbnails?: boolean;
+  disableBlurGeneration?: boolean;
 }
 
 export type ProcessImageConfig = {
+  loggerConfig: LoggerConfig;
   imagePath: string;
   stats: FileStats;
   cachedPhoto?: FullPhoto;
@@ -37,5 +42,6 @@ export type ImageProcessorResult = {
 };
 
 export type ImageProcessor = (
+  logger: Logger,
   images: ProcessImageConfig[]
-) => Promise<ImageProcessorResult>;
+) => Promise<Promise<ProcessedResult>[]>;

@@ -1,13 +1,9 @@
-import {
-  ImageProcessor,
-  ImageProcessorResult,
-  ProcessedResult,
-  ProcessImageConfig,
-} from "./types";
+import { ImageProcessor, ProcessedResult, ProcessImageConfig } from "./types";
 import axios from "axios";
 import environment from "../environment";
 import crypto from "crypto";
 import { parseDateTimeOriginal } from "../utils";
+import { Logger } from "winston";
 
 interface ImagorMetaResult {
   format: string;
@@ -53,24 +49,18 @@ const buildImagorSrc = (imagePath: string) => {
   );
 };
 
-const processImage = async ({
-  imagePath,
-  cachedPhoto,
-  stats,
-}: ProcessImageConfig): Promise<ProcessedResult> => {
-  const start = process.hrtime();
-  var elapsed = process.hrtime(start)[1] / 1000000; // divide by a million to get nano to milli
-  const seconds = process.hrtime(start)[0];
-  const ms = elapsed.toFixed(0);
-  const processTime = (seconds > 0 ? seconds + "s" : "") + ms + "ms"; // print message + time
-
+const processImage = async (
+  logger: Logger,
+  { imagePath, cachedPhoto, stats }: ProcessImageConfig
+): Promise<ProcessedResult> => {
   const canSkip = cachedPhoto && cachedPhoto.fileSize === stats.fileSize;
   if (canSkip) {
-    return { photo: cachedPhoto, cached: true, processTime };
+    return { imagePath, photo: cachedPhoto, cached: true };
   }
   const url = buildMetadataURL(imagePath).toString();
-  const { data, headers } = await axios.get<ImagorMetaResult>(url);
+  const { data } = await axios.get<ImagorMetaResult>(url);
   return {
+    imagePath,
     cached: false,
     photo: {
       width: data.width,
@@ -81,34 +71,12 @@ const processImage = async ({
         : null,
       thumbnailSrc: buildImagorSrc(imagePath).toString(),
     },
-    processTime,
   };
 };
 
-export const createImagorProcessor = (): ImageProcessor => async (configs) => {
-  const promises = configs.map(
-    async (config): Promise<ImageProcessorResult> => {
-      const { cached, photo, processTime }: ProcessedResult =
-        await processImage(config);
-      if (photo) {
-        console.log(
-          `Processed file ${config.imagePath} - ${photo.width}x${
-            photo.height
-          } ${cached ? "(Cached)" : `(${processTime})`}`
-        );
-      } else {
-        console.log(`Processed file ${config.imagePath} - Not generated`);
-      }
-      return {
-        [config.imagePath]: { cached, photo, processTime },
-      };
-    }
-  );
-
-  const result = await Promise.all(promises);
-
-  return result.reduce(
-    (prev, result) => ({ ...prev, ...result }),
-    {} as ImageProcessorResult
-  );
+export const createImagorProcessor: ImageProcessor = async (
+  logger,
+  configs
+) => {
+  return configs.map(async (config) => processImage(logger, config));
 };
